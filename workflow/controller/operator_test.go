@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/argoproj/argo-workflows/v3/util/cmd"
+	"github.com/argoproj/pkg/cli"
 	"os"
 	"regexp"
 	"strconv"
@@ -41,6 +43,12 @@ import (
 	"github.com/argoproj/argo-workflows/v3/workflow/util"
 )
 
+func Init() {
+	cli.SetLogLevel("debug")
+	cmd.SetGLogLevel(6)
+	os.Setenv("MAX_OPERATION_TIME", "6000s")
+}
+
 // TestOperateWorkflowPanicRecover ensures we can recover from unexpected panics
 func TestOperateWorkflowPanicRecover(t *testing.T) {
 	defer func() {
@@ -48,8 +56,11 @@ func TestOperateWorkflowPanicRecover(t *testing.T) {
 			t.Fail()
 		}
 	}()
+	Init()
+
 	cancel, controller := newController()
 	defer cancel()
+
 	// intentionally set clientset to nil to induce panic
 	controller.kubeclientset = nil
 	wf := wfv1.MustUnmarshalWorkflow(helloWorldWf)
@@ -132,6 +143,8 @@ spec:
      container: 
        image: my-image
 `)
+	Init()
+
 	cancel, controller := newController(wf)
 	defer cancel()
 
@@ -3121,6 +3134,7 @@ func TestStepWFGetNodeName(t *testing.T) {
 }
 
 func TestDAGWFGetNodeName(t *testing.T) {
+
 	cancel, controller := newController()
 	defer cancel()
 	wfcset := controller.wfclientset.ArgoprojV1alpha1().Workflows("")
@@ -3133,6 +3147,7 @@ func TestDAGWFGetNodeName(t *testing.T) {
 	assert.True(t, hasOutputResultRef("A", &wf.Spec.Templates[0]))
 	assert.False(t, hasOutputResultRef("B", &wf.Spec.Templates[0]))
 	woc := newWorkflowOperationCtx(wf, controller)
+	Init()
 	woc.operate(ctx)
 	wf, err = wfcset.Get(ctx, wf.ObjectMeta.Name, metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -7180,7 +7195,8 @@ func TestDagTwoChildrenWithNonExpectedNodeType(t *testing.T) {
 	assert.Len(t, sentNode.Children, 2)
 }
 
-const testDagTwoChildrenContainerSet = `apiVersion: argoproj.io/v1alpha1
+const testDagTwoChildrenContainerSetBak = `
+apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   name: outputs-result-pn6gb
@@ -7221,9 +7237,49 @@ status:
   startedAt: "2021-06-24T18:05:35Z"
 `
 
+const testDagTwoChildrenContainerSet = `
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: outputs-result-pn6gb
+spec:
+  entrypoint: main
+  templates:
+  - dag:
+      tasks:
+      - name: a
+        template: group
+      - arguments:
+          parameters:
+          - name: x
+            value: '{{tasks.a.outputs.result}}'
+        depends: a
+        name: b
+        template: verify
+    name: main
+  - containerSet:
+      containers:
+      - args:
+        - -c
+        - |
+          print("hi")
+        image: python:alpine3.6
+        name: main
+    name: group
+  - inputs:
+      parameters:
+      - name: x
+    name: verify
+    script:
+      image: python:alpine3.6
+      source: |
+        assert "{{inputs.parameters.x}}" == "hi"
+`
+
 // In this test, a pod originating from a container set should not be its own outbound node. "a" should only have one child
 // and "main" should be the outbound node.
 func TestDagTwoChildrenContainerSet(t *testing.T) {
+	Init()
 	wf := wfv1.MustUnmarshalWorkflow(testDagTwoChildrenContainerSet)
 	cancel, controller := newController(wf)
 	defer cancel()
@@ -7232,6 +7288,7 @@ func TestDagTwoChildrenContainerSet(t *testing.T) {
 	woc := newWorkflowOperationCtx(wf, controller)
 
 	woc.operate(ctx)
+
 	woc.operate(ctx)
 
 	sentNode := woc.wf.Status.Nodes.FindByDisplayName("a")

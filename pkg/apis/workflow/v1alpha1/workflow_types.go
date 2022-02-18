@@ -2638,6 +2638,7 @@ func (wf *Workflow) GetTemplateByName(name string) *Template {
 	return nil
 }
 
+// GetNodeByName get node status by name from Status.Nodes
 func (wf *Workflow) GetNodeByName(nodeName string) *NodeStatus {
 	nodeID := wf.NodeID(nodeName)
 	node, ok := wf.Status.Nodes[nodeID]

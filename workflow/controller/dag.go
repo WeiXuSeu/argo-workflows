@@ -58,6 +58,7 @@ type dagContext struct {
 	dependsLogic map[string]string
 }
 
+// GetTaskDependencies get dependency by task name: [task1, task2, task3]
 func (d *dagContext) GetTaskDependencies(taskName string) []string {
 	if dependencies, ok := d.dependencies[taskName]; ok {
 		return dependencies
@@ -94,6 +95,9 @@ func (d *dagContext) GetTaskDependsLogic(taskName string) string {
 	return d.dependsLogic[taskName]
 }
 
+// resolveDependencies resolve dependency
+// dependency, task name: [task1, task2, task3]
+// dependsLogic, string: "((task-1.Succeeded || task-1.Skipped || task-1.Daemoned) || task-2.Succeeded) && !task-3.Succeeded"
 func (d *dagContext) resolveDependencies(taskName string) {
 	dependencies, resolvedDependsLogic := common.GetTaskDependencies(d.GetTask(taskName), d)
 	var dependencyTasks []string
@@ -116,7 +120,7 @@ func (d *dagContext) taskNodeID(taskName string) string {
 	return d.wf.NodeID(nodeName)
 }
 
-// getTaskNode returns the node status of a task.
+// getTaskNode returns the node status of a task in wf.Status.Nodes
 func (d *dagContext) getTaskNode(taskName string) *wfv1.NodeStatus {
 	nodeID := d.taskNodeID(taskName)
 	node, ok := d.wf.Status.Nodes[nodeID]
@@ -341,6 +345,7 @@ func (woc *wfOperationCtx) executeDAGTask(ctx context.Context, dagCtx *dagContex
 	}
 	dagCtx.visited[taskName] = true
 
+	// getTaskNode returns the node status of a task in wf.Status.Nodes
 	node := dagCtx.getTaskNode(taskName)
 	task := dagCtx.GetTask(taskName)
 	if node != nil && node.Fulfilled() {

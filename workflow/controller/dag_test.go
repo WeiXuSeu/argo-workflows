@@ -14,6 +14,15 @@ import (
 	"github.com/argoproj/argo-workflows/v3/workflow/common"
 )
 
+func TestWorkflowDagDiamond(t *testing.T) {
+	Init()
+	wf := wfv1.MustUnmarshalWorkflow("@../../examples/dag-diamond.yaml")
+	woc := newWoc(*wf)
+	ctx := context.Background()
+	woc.operate(ctx)
+	assert.Equal(t, wfv1.WorkflowFailed, woc.wf.Status.Phase)
+}
+
 // TestDagXfail verifies a DAG can fail properly
 func TestDagXfail(t *testing.T) {
 	wf := wfv1.MustUnmarshalWorkflow("@testdata/dag_xfail.yaml")

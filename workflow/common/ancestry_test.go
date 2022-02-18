@@ -32,6 +32,8 @@ func TestGetTaskDependenciesFromDepends(t *testing.T) {
 	for _, dep := range []string{"task-1", "task-2", "task-3"} {
 		assert.Contains(t, deps, dep)
 	}
+
+	// convert to ((task-1.Succeeded || task-1.Skipped || task-1.Daemoned) || task-2.Succeeded) && !task-3.Succeeded
 	assert.Equal(t, "((task-1.Succeeded || task-1.Skipped || task-1.Daemoned) || task-2.Succeeded) && !task-3.Succeeded", logic)
 
 	task = &wfv1.DAGTask{Depends: "(task-1 || task-2.AnySucceeded) && !task-3.Succeeded"}
